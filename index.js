@@ -354,7 +354,19 @@ const applyWhere = (qb, where) => {
 };
 
 const applyOrderBy = (qb, orderBy) => {
-    qb.orderBy(orderBy);
+    if (!isPlainObject(orderBy)) throw new Error('OrderBy must be an object');
+    
+    for (const key in orderBy) {
+        const value = orderBy[key];
+
+        if (value === 'asc') {
+            qb.orderBy(key, 'asc');
+        } else if (value === 'desc') {
+            qb.orderBy(key, 'desc');
+        } else {
+            throw new Error(`Invalid order direction ${value}`);
+        }
+    }
 
     return qb;
 };
