@@ -1,0 +1,14 @@
+{
+  "name": "qs2knex",
+  "description": "Converts a QS string or parsed query object to knex query",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/d4n5h/qs2knex.git",
+  "author": "Daniel Shlomo <dshlomo4@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "knex": "^2.5.1",
+    "lodash": "^4.17.21",
+    "qs": "^6.11.2"
+  }
+}
