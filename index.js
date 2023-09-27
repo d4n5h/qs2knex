@@ -5,7 +5,7 @@ const qs = require('qs');
 // Utils
 const isKnexQuery = value => value instanceof KnexBuilder || value instanceof KnexRaw;
 const fieldLowerFn = qb => qb.client.config.client === 'postgres' ? 'LOWER(CAST(?? AS VARCHAR))' : 'LOWER(??)';
-const castArray = (...args) => args.reduce((acc, arg) => acc.concat(arg), []);
+const castArray = (...args) => args.flat();
 const getTag = value => value == null ? value === undefined ? '[object Undefined]' : '[object Null]' : Object.prototype.toString.call(value);
 const isObjectLike = value => typeof value === 'object' && value !== null;
 
@@ -19,7 +19,6 @@ const isPlainObject = (value) => {
 
     return Object.getPrototypeOf(value) === proto;
 }
-
 
 /**
  * Apply operator to query builder
@@ -44,282 +43,131 @@ const applyOperator = (type, qb, column, operator, value) => {
         });
     }
 
+    const applyToColumn = isWhere ? applyWhereToColumn : applyHavingToColumn;
+
     switch (operator) {
         case '$not': {
-            if (isWhere) {
-                qb.whereNot((qb) => applyWhereToColumn(qb, column, value));
-            } else {
-                qb.havingNot((qb) => applyHavingToColumn(qb, column, value));
-            }
-
+            qb[type + 'Not']((qb) => applyToColumn(qb, column, value));
             break;
         }
         case '$in': {
-            if (isWhere) {
-                qb.whereIn(column, isKnexQuery(value) ? value : castArray(value));
-            } else {
-                qb.havingIn(column, isKnexQuery(value) ? value : castArray(value));
-            }
-
+            qb[type + 'In'](column, isKnexQuery(value) ? value : castArray(value));
             break;
         }
         case '$notIn': {
-            if (isWhere) {
-                qb.whereNotIn(column, isKnexQuery(value) ? value : castArray(value));
-            } else {
-                qb.havingNotIn(column, isKnexQuery(value) ? value : castArray(value));
-            }
-
+            qb[type + 'NotIn'](column, isKnexQuery(value) ? value : castArray(value));
             break;
         }
         case '$eq': {
-            if (isWhere) {
-                if (value === null) {
-                    qb.whereNull(column);
-                    break;
-                }
-
-                qb.where(column, value);
+            if (value === null) {
+                qb[type + 'Null'](column);
             } else {
-                if (value === null) {
-                    qb.havingNull(column);
-                    break;
-                }
-
-                qb.having(column, value);
+                qb[type](column, value);
             }
-
             break;
         }
         case '$eqi': {
-            if (isWhere) {
-                if (value === null) {
-                    qb.whereNull(column);
-                    break;
-                }
-                qb.whereRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `${value}`]);
+            if (value === null) {
+                qb[type + 'Null'](column);
             } else {
-                if (value === null) {
-                    qb.havingNull(column);
-                    break;
-                }
-                qb.havingRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `${value}`]);
+                qb[type + 'Raw'](`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `${value}`]);
             }
-
             break;
         }
         case '$ne': {
-            if (isWhere) {
-                if (value === null) {
-                    qb.whereNotNull(column);
-                    break;
-                }
-
-                qb.where(column, '<>', value);
+            if (value === null) {
+                qb[type + 'NotNull'](column);
             } else {
-                if (value === null) {
-                    qb.havingNotNull(column);
-                    break;
-                }
-
-                qb.having(column, '<>', value);
+                qb[type](column, '<>', value);
             }
-
             break;
         }
         case '$nei': {
-            if (isWhere) {
-                if (value === null) {
-                    qb.whereNotNull(column);
-                    break;
-                }
-
-                qb.whereRaw(`${fieldLowerFn(qb)} NOT LIKE LOWER(?)`, [column, `${value}`]);
-
+            if (value === null) {
+                qb[type + 'NotNull'](column);
             } else {
-                if (value === null) {
-                    qb.havingNotNull(column);
-                    break;
-                }
-                qb.havingRaw(`${fieldLowerFn(qb)} NOT LIKE LOWER(?)`, [column, `${value}`]);
+                qb[type + 'Raw'](`${fieldLowerFn(qb)} NOT LIKE LOWER(?)`, [column, `${value}`]);
             }
-
             break;
         }
         case '$gt': {
-            if (isWhere) {
-                qb.where(column, '>', value);
-            } else {
-                qb.having(column, '>', value);
-            }
-
+            qb[type](column, '>', value);
             break;
         }
         case '$gte': {
-            if (isWhere) {
-                qb.where(column, '>=', value);
-            } else {
-                qb.having(column, '>=', value);
-            }
-
+            qb[type](column, '>=', value);
             break;
         }
         case '$lt': {
-            if (isWhere) {
-                qb.where(column, '<', value);
-            } else {
-                qb.having(column, '<', value);
-            }
-
+            qb[type](column, '<', value);
             break;
         }
         case '$lte': {
-            if (isWhere) {
-                qb.where(column, '<=', value);
-            } else {
-                qb.having(column, '<=', value);
-            }
-
+            qb[type](column, '<=', value);
             break;
         }
         case '$null': {
-            if (isWhere) {
-                if (value) {
-                    qb.whereNull(column);
-                } else {
-                    qb.whereNotNull(column);
-                }
+            if (value) {
+                qb[type + 'Null'](column);
             } else {
-                if (value) {
-                    qb.havingNull(column);
-                } else {
-                    qb.havingNotNull(column);
-                }
+                qb[type + 'NotNull'](column);
             }
-
             break;
         }
         case '$notNull': {
-            if (isWhere) {
-                if (value) {
-                    qb.whereNotNull(column);
-                } else {
-                    qb.whereNull(column);
-                }
+            if (value) {
+                qb[type + 'NotNull'](column);
             } else {
-                if (value) {
-                    qb.havingNotNull(column);
-                } else {
-                    qb.havingNull(column);
-                }
+                qb[type + 'Null'](column);
             }
-
             break;
         }
         case '$between': {
-            if (isWhere) {
-                qb.whereBetween(column, value);
-            } else {
-                qb.havingBetween(column, value);
-            }
-
+            qb[type + 'Between'](column, value);
             break;
         }
         case '$notBetween': {
-            if (isWhere) {
-                qb.whereNotBetween(column, value);
-            } else {
-                qb.havingNotBetween(column, value);
-            }
-
+            qb[type + 'NotBetween'](column, value);
             break;
         }
         case '$startsWith': {
-            if (isWhere) {
-                qb.where(column, 'like', `${value}%`);
-            } else {
-                qb.having(column, 'like', `${value}%`);
-            }
-
+            qb[type](column, 'like', `${value}%`);
             break;
         }
         case '$startsWithi': {
-            if (isWhere) {
-                qb.whereRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `${value}%`]);
-            } else {
-                qb.havingRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `${value}%`]);
-            }
-
+            qb[type + 'Raw'](`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `${value}%`]);
             break;
         }
         case '$endsWith': {
-            if (isWhere) {
-                qb.where(column, 'like', `%${value}`);
-            } else {
-                qb.having(column, 'like', `%${value}`);
-            }
-
+            qb[type](column, 'like', `%${value}`);
             break;
         }
         case '$endsWithi': {
-            if (isWhere) {
-                qb.whereRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `%${value}`]);
-            } else {
-                qb.havingRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `%${value}`]);
-            }
-
+            qb[type + 'Raw'](`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `%${value}`]);
             break;
         }
         case '$contains': {
-            if (isWhere) {
-                qb.where(column, 'like', `%${value}%`);
-            } else {
-                qb.having(column, 'like', `%${value}%`);
-            }
-
+            qb[type](column, 'like', `%${value}%`);
             break;
         }
         case '$notContains': {
-            if (isWhere) {
-                qb.whereNot(column, 'like', `%${value}%`);
-            } else {
-                qb.havingNot(column, 'like', `%${value}%`);
-            }
-
+            qb[type + 'Not'](column, 'like', `%${value}%`);
             break;
         }
         case '$containsi': {
-            if (isWhere) {
-                qb.whereRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `%${value}%`]);
-            } else {
-                qb.havingRaw(`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `%${value}%`]);
-            }
-
+            qb[type + 'Raw'](`${fieldLowerFn(qb)} LIKE LOWER(?)`, [column, `%${value}%`]);
             break;
         }
         case '$notContainsi': {
-            if (isWhere) {
-                qb.whereRaw(`${fieldLowerFn(qb)} NOT LIKE LOWER(?)`, [column, `%${value}%`]);
-            } else {
-                qb.havingRaw(`${fieldLowerFn(qb)} NOT LIKE LOWER(?)`, [column, `%${value}%`]);
-            }
-
+            qb[type + 'Raw'](`${fieldLowerFn(qb)} NOT LIKE LOWER(?)`, [column, `%${value}%`]);
             break;
         }
         case '$jsonSupersetOf': {
-            if (isWhere) {
-                qb.whereJsonSupersetOf(column, value);
-            } else {
-                qb.havingJsonSupersetOf(column, value);
-            }
+            qb[type + 'JsonSupersetOf'](column, value);
             break;
         }
         case '$jsonNotSupersetOf': {
-            if (isWhere) {
-                qb.whereJsonNotSupersetOf(column, value);
-            } else {
-                qb.havingJsonNotSupersetOf(column, value);
-            }
+            qb[type + 'JsonNotSupersetOf'](column, value);
             break;
         }
         default: throw new Error(`Undefined attribute level operator ${operator} (${column})`);
@@ -346,10 +194,11 @@ const applyWhereToColumn = (qb, column, columnWhere) => {
         applyOperator('where', qb, column, operator, value);
     });
 };
+
 /**
  * Apply where to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} where Where
+ * @param {Object} where Where
  * @returns {Object} Knex query builder instance
  */
 const applyWhere = (qb, where) => {
@@ -386,7 +235,7 @@ const applyWhere = (qb, where) => {
 /**
  * Apply order by to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} orderBy Order by
+ * @param {Object} orderBy Order by
  * @returns {Object} Knex query builder instance
  */
 const applyOrderBy = (qb, orderBy) => {
@@ -406,7 +255,7 @@ const applyOrderBy = (qb, orderBy) => {
 /**
  * Apply select to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} select Select
+ * @param {String | Array} select Select
  * @returns {Object} Knex query builder instance
  */
 const applySelect = (qb, select) => {
@@ -419,7 +268,7 @@ const applySelect = (qb, select) => {
 /**
  * Apply limit to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} limit Limit
+ * @param {Number} limit Limit
  * @returns {Object} Knex query builder instance
  */
 const applyLimit = (qb, limit) => {
@@ -430,7 +279,7 @@ const applyLimit = (qb, limit) => {
 /**
  * Apply offset to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} offset Offset
+ * @param {Number} offset Offset
  * @returns {Object} Knex query builder instance
  */
 const applyOffset = (qb, offset) => {
@@ -454,7 +303,7 @@ const applyGroupBy = (qb, groupBy) => {
 /**
  * Apply having to column
  * @param {Object} qb Knex query builder instance
- * @param {any} column Column name
+ * @param {String} column Column name
  * @param {any} columnHaving Column having
  * @returns {Object} Knex query builder instance
  */
@@ -474,7 +323,7 @@ const applyHavingToColumn = (qb, column, columnHaving) => {
 /**
  * Apply having to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} having Having
+ * @param {Object} having Having
  * @returns {Object} Knex query builder instance
  */
 const applyHaving = (qb, having) => {
@@ -500,7 +349,7 @@ const applyHaving = (qb, having) => {
 /**
  * Apply join to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} join Join
+ * @param {Object} join Join
  * @returns {Object} Knex query builder instance
  */
 const applyJoin = (qb, join) => {
@@ -518,18 +367,10 @@ const applyJoin = (qb, join) => {
     qb[method](`${referencedTable} as ${alias}`, (inner) => {
         inner.on(`${rootTable}.${rootColumn}`, `${alias}.${referencedColumn}`);
 
-        if (on) {
-            Object.entries(on).forEach(([key, value]) => {
-                inner.onVal(`${alias}.${key}`, value);
-            });
-        }
+        if (on) Object.entries(on).forEach(([key, value]) => inner.onVal(`${alias}.${key}`, value));
     });
 
-    if (orderBy) {
-        Object.entries(orderBy).forEach(([column, direction]) => {
-            qb.orderBy(`${alias}.${column}`, direction);
-        });
-    }
+    if (orderBy) Object.entries(orderBy).forEach(([column, direction]) => qb.orderBy(`${alias}.${column}`, direction));
 
     return qb;
 };
@@ -537,7 +378,7 @@ const applyJoin = (qb, join) => {
 /**
  * Apply joins to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} joins Joins
+ * @param {Array} joins Joins
  * @returns {Object} Knex query builder instance
  */
 const applyJoins = (qb, joins) => joins.forEach((join) => applyJoin(qb, join));
@@ -545,7 +386,7 @@ const applyJoins = (qb, joins) => joins.forEach((join) => applyJoin(qb, join));
 /**
  * Apply parsed qs object to query builder
  * @param {Object} qb Knex query builder instance
- * @param {any} query Query
+ * @param {Object} query Query
  * @returns {Object} Knex query builder instance
  * @example applyParsed(qb, { select: ['id','name], where: { name: 'John' }, limit: 10, offset: 20})
  */
